@@ -23,3 +23,5 @@ try:
 
 except KeyboardInterrupt:
     print("\n✅ Sensor stopped by user. Goodbye!")
+
+    #run command : python sensor_simulator.py

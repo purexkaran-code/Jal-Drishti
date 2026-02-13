@@ -1,37 +1,29 @@
 import streamlit as st
 import pandas as pd
 import time
+from google import genai
 
-# --- PAGE CONFIGURATION ---
-st.set_page_config(
-    page_title="Jal-Drishti Command Center",
-    page_icon="🌊",
-    layout="wide"  # Uses the whole screen width
-)
+# --- CONFIGURATION ---
+# Paste your API key inside the quotes below!
+client = genai.Client(api_key="AIzaSyA6FyL4mXbR3Od7zxwX2PS6pTMMoDRfFCY")
 
-# --- SIDEBAR (The Manual) ---
+st.set_page_config(page_title="Jal-Drishti Command Center", page_icon="🌊", layout="wide")
+
+# --- SIDEBAR ---
 with st.sidebar:
     st.header("📘 Control Panel")
     st.markdown("### System Status: **ONLINE**")
-    
-    # Load the manual
     try:
         with open("flood_guidelines.txt", "r") as f:
             safety_manual = f.read()
     except FileNotFoundError:
         safety_manual = "Protocol B-12: Evacuate to high ground."
-        
-    st.info(f"**Current Protocol:**\n\n{safety_manual}")
-    st.write("---")
-    st.caption("Powered by Pathway & OpenAI")
+    st.info(f"**Knowledge Base (NDMA):**\n\n{safety_manual}")
 
 # --- MAIN DASHBOARD ---
-st.title("🌊 Jal-Drishti: Urban Flood Monitor")
+st.title("🌊 Jal-Drishti: AI Flood Monitor")
 
-# Create 3 columns for big stats
 col1, col2, col3 = st.columns(3)
-
-# Placeholders for the big numbers
 with col1:
     level_metric = st.empty()
 with col2:
@@ -39,54 +31,63 @@ with col2:
 with col3:
     trend_metric = st.empty()
 
-st.divider() # A nice visual line
+st.divider()
 
-# Placeholder for the main chart
-st.subheader("Real-Time Water Levels (Sector 4)")
-chart_holder = st.empty()
+left_col, right_col = st.columns(2)
+with left_col:
+    st.subheader("Real-Time Water Levels")
+    chart_holder = st.empty()
+    alert_box = st.empty()
+with right_col:
+    st.subheader("Live Sector Map (Sector 4)")
+    map_holder = st.empty()
 
-# Placeholder for the BIG RED ALERT
-alert_box = st.empty()
+map_data = pd.DataFrame({'lat': [28.6139], 'lon': [77.2090]})
+
+current_ai_message = None 
 
 while True:
     try:
-        # Read data
         data = pd.read_csv("water_data.csv")
         
         if not data.empty:
             current_level = data.iloc[-1]["water_level"]
-            
-            # Calculate "Rate of Rise" (Current - Previous)
-            if len(data) > 1:
-                prev_level = data.iloc[-2]["water_level"]
-                change = current_level - prev_level
-            else:
-                change = 0
+            change = current_level - data.iloc[-2]["water_level"] if len(data) > 1 else 0
 
-            # --- UPDATE THE METRICS ---
             level_metric.metric(label="Water Level", value=f"{current_level:.1f} cm", delta=f"{change:.2f} cm")
             
-            # --- COLOR LOGIC ---
             if current_level > 45:
                 status_metric.metric(label="Status", value="CRITICAL", delta_color="inverse")
                 trend_metric.error("⚠️ EVACUATE")
+                chart_holder.line_chart(data["water_level"], color="#ff4b4b")
+                map_holder.map(map_data, size=2000, color="#ff0000") 
                 
-                # Show the Area Chart (Looks like water)
-                chart_holder.area_chart(data["water_level"], color="#ff4b4b") # Red water
+                # --- THE NEW RAG AI BRAIN ---
+                if current_ai_message is None:
+                    prompt = f"You are an emergency AI. Water level is {current_level:.1f}cm. Read manual: '{safety_manual}'. Write a 2-sentence evacuation command for Sector 4 based ONLY on the manual."
+                    try:
+                        # Using the new Google GenAI syntax!
+                        response = client.models.generate_content(
+                            model='gemini-2.5-flash',
+                            contents=prompt
+                        )
+                        current_ai_message = response.text
+                    except Exception as e:
+                        current_ai_message = "AI connection error. Evacuate immediately based on manual protocols."
                 
-                # Big Alert Message
-                alert_box.error(f"🚨 FLASH FLOOD DETECTED! \n\nAI ADVICE: {safety_manual}")
+                alert_box.error(f"🚨 LIVE AI EVACUATION PROTOCOL:\n\n**{current_ai_message}**")
                 
             else:
                 status_metric.metric(label="Status", value="Normal")
                 trend_metric.success("✅ SAFE")
+                chart_holder.line_chart(data["water_level"], color="#0000FF")
+                map_holder.map(map_data, size=100, color="#0044ff")
                 
-                # Show Blue Water
-                chart_holder.area_chart(data["water_level"], color="#0000FF") 
-                
-                alert_box.empty() # Clear the alert if safe
+                current_ai_message = None 
+                alert_box.empty()
 
     except Exception as e:
-        time.sleep(0.5)
-        
+            st.error(f"System Error: {e}")
+            time.sleep(1)
     time.sleep(1)
+    #run cmd: streamlit run dashboard.py
