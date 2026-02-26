@@ -5,7 +5,7 @@ from google import genai
 
 # --- CONFIGURATION ---
 # Paste your API key inside the quotes below!
-client = genai.Client(api_key="AIzaSyA6FyL4mXbR3Od7zxwX2PS6pTMMoDRfFCY")
+client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
 st.set_page_config(page_title="Jal-Drishti Command Center", page_icon="🌊", layout="wide")
 
